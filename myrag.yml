@@ -1,0 +1,29 @@
+name: myrag
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - poppler
+  - tesseract
+  - pip
+  - pip:
+      - accelerate
+      - bitsandbytes
+      - chromadb
+      - langchain
+      - langchain-community
+      - langchain-core
+      - langchain-huggingface
+      - langchain-unstructured[local]
+      - libmagic
+      - pillow
+      - pypdf2
+      - python-magic
+      - sentence-transformers
+      - streamlit
+      - torch
+      - torchvision
+      - torchaudio
+      - transformers
+      - unstructured[all-docs]
