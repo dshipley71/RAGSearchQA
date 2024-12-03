@@ -6,7 +6,11 @@ import streamlit as st
 from datetime import datetime
 from rag_application import RAGApplication
 
+# disable telemetry
 os.environ["ANONYMIZED_TELEMETRY"]="False"
+os.environ["SCARF_NO_ANALYTICS"]="true"
+
+# location of NLTK data
 os.environ["NLTK_DATA"]="./nltk_data"
 
 @st.cache_resource
