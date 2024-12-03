@@ -1,11 +1,12 @@
 import os
 import json
 import tempfile
+import torch
 from datetime import datetime
 from PyPDF2 import PdfReader
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.prompts import ChatPromptTemplate
@@ -14,6 +15,7 @@ from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
 from langchain_unstructured import UnstructuredLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class RAGApplication:
     """
@@ -106,13 +108,16 @@ class RAGApplication:
         """
         if embedding_model_name:
             self.embedding_model_name = embedding_model_name
-        embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model_name)
+        embeddings = HuggingFaceEmbeddings(
+            model_name=self.embedding_model_name,
+            model_kwargs = {"device": device},
+            encode_kwargs = {"normalize_embeddings": True}
+        )
         vector_store = Chroma.from_documents(
             documents=filter_complex_metadata(text_chunks),
             embedding=embeddings,
             persist_directory=self.vector_store_path
         )
-        vector_store.persist()
         self.vector_store = vector_store  # Cache the vector store
 
     def load_vector_store(self):
@@ -177,12 +182,20 @@ class RAGApplication:
                 load_in_4bit=True,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype="bfloat16"
+                bnb_4bit_compute_dtype= "bfloat16"
             )
-            tokenizer = AutoTokenizer.from_pretrained(llm_model)
+            tokenizer = AutoTokenizer.from_pretrained(
+                llm_model,
+                local_files_only=True,
+            )
+            
             model = AutoModelForCausalLM.from_pretrained(
-                llm_model, quantization_config=bnb_config
-            )
+                llm_model,
+                # quantization_config=bnb_config
+                local_files_only=True,
+                low_cpu_mem_usage=True
+            ).to(device)
+            
             pipe = pipeline(
                 "text-generation",
                 model=model,
@@ -193,6 +206,7 @@ class RAGApplication:
                 repetition_penalty=1.15,
                 return_full_text=False,
             )
+            
             self.cached_llm = HuggingFacePipeline(pipeline=pipe)
         return self.cached_llm
 

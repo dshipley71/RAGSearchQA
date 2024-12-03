@@ -1,7 +1,13 @@
 import os
+import io
+import base64
+from PIL import Image
 import streamlit as st
 from datetime import datetime
 from rag_application import RAGApplication
+
+os.environ["ANONYMIZED_TELEMETRY"]="False"
+os.environ["NLTK_DATA"]="./nltk_data"
 
 @st.cache_resource
 def initialize_rag_application(vector_store_path, embedding_model_name, temperature, max_new_tokens, top_p):
@@ -87,7 +93,15 @@ def main():
         with st.expander(label="Model Selection:", expanded=False):
             embedding_model_name = st.selectbox("Embedding Model", ["all-MiniLM-L6-v2", "multilingual-e5-large"], help="Default set to all-MiniLM-L6-v2")
             vlm_model = st.selectbox("Vision Language Model:", ["Llama-3.2-11B-Vision-Instruct", "Phi-3.5-vision-instruct"], help="Default set to Llama-3.2-11B-Vision-Instruct")
+<<<<<<< HEAD
+            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Meta-Llama-3.1-70B-Instruct-AWQ-INT4"], help="Default set to Llama-3.2-3B-Instruct")
+            
+            embedding_model_name = "models/" + embedding_model_name
+            vlm_model = "models/" + vlm_model
+            llm_model = "models/" + llm_model
+=======
             llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Llama-3.1-70B-Instruct"], help="Default set to Llama-3.2-3B-Instruct")
+>>>>>>> 725411879dd0fc54b49f539549085dc5f78d88fd
 
         # Document Settings
         with st.expander(label="Document Settings:", expanded=False):
@@ -106,8 +120,22 @@ def main():
 
     # Main Content Area
     with col2:
+<<<<<<< HEAD
+
+        image = Image.open("assets/ai_banner.jpg")
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        html_temp = f"""
+        <div style="text-align: center;">
+        <img src="data:image/jpeg.base64,{img_str}"/>
+        </div>
+        """
+#        st.image("assets/ai_banner.jpg", use_container_width=True)
+=======
         
         st.image("assets/ai_banner.jpg", use_container_width=True)
+>>>>>>> 725411879dd0fc54b49f539549085dc5f78d88fd
         st.header("AI Document Q&A")
 
         # Initialize session state for conversation history

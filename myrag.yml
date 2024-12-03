@@ -12,6 +12,7 @@ dependencies:
       - bitsandbytes
       - chromadb
       - langchain
+      - langchain-chroma
       - langchain-community
       - langchain-core
       - langchain-huggingface
