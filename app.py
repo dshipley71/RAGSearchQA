@@ -25,7 +25,7 @@ def initialize_rag_application(vector_store_path, embedding_model_name, temperat
 # Configure the page layout
 st.set_page_config(
     page_title="RAG-Search-QA",
-    page_icon="assets/ai_banner.jpg",
+    page_icon="assets/ai_sidebar.jpg",
     layout="wide"
 )
 
