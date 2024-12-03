@@ -23,7 +23,11 @@ def initialize_rag_application(vector_store_path, embedding_model_name, temperat
     )
 
 # Configure the page layout
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="RAG-Search-QA",
+    page_icon="assets/ai_banner.jpg",
+    layout="wide"
+)
 
 # Custom CSS for styling columns with margins
 custom_style = '''
@@ -116,16 +120,16 @@ def main():
 
     # Main Content Area
     with col2:
-        image = Image.open("assets/ai_banner.jpg")
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-        html_temp = f"""
-        <div style="text-align: center;">
-        <img src="data:image/jpeg.base64,{img_str}"/>
-        </div>
-        """
-#        st.image("assets/ai_banner.jpg", use_container_width=True)        
+        # image = Image.open("assets/ai_banner.jpg")
+        # buffered = io.BytesIO()
+        # image.save(buffered, format="JPEG")
+        # img_str = base64.b64encode(buffered.getvalue()).decode()
+        # html_temp = f"""
+        # <div style="text-align: center;">
+        # <img src="data:image/jpeg.base64,{img_str}"/>
+        # </div>
+        # """
+        st.image("assets/ai_banner.jpg", use_container_width=True)        
         st.header("AI Document Q&A")
 
         # Initialize session state for conversation history
