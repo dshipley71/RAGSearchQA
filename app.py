@@ -93,15 +93,11 @@ def main():
         with st.expander(label="Model Selection:", expanded=False):
             embedding_model_name = st.selectbox("Embedding Model", ["all-MiniLM-L6-v2", "multilingual-e5-large"], help="Default set to all-MiniLM-L6-v2")
             vlm_model = st.selectbox("Vision Language Model:", ["Llama-3.2-11B-Vision-Instruct", "Phi-3.5-vision-instruct"], help="Default set to Llama-3.2-11B-Vision-Instruct")
-<<<<<<< HEAD
             llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Meta-Llama-3.1-70B-Instruct-AWQ-INT4"], help="Default set to Llama-3.2-3B-Instruct")
             
             embedding_model_name = "models/" + embedding_model_name
             vlm_model = "models/" + vlm_model
             llm_model = "models/" + llm_model
-=======
-            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Llama-3.1-70B-Instruct"], help="Default set to Llama-3.2-3B-Instruct")
->>>>>>> 725411879dd0fc54b49f539549085dc5f78d88fd
 
         # Document Settings
         with st.expander(label="Document Settings:", expanded=False):
@@ -120,8 +116,6 @@ def main():
 
     # Main Content Area
     with col2:
-<<<<<<< HEAD
-
         image = Image.open("assets/ai_banner.jpg")
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG")
@@ -131,11 +125,7 @@ def main():
         <img src="data:image/jpeg.base64,{img_str}"/>
         </div>
         """
-#        st.image("assets/ai_banner.jpg", use_container_width=True)
-=======
-        
-        st.image("assets/ai_banner.jpg", use_container_width=True)
->>>>>>> 725411879dd0fc54b49f539549085dc5f78d88fd
+#        st.image("assets/ai_banner.jpg", use_container_width=True)        
         st.header("AI Document Q&A")
 
         # Initialize session state for conversation history
