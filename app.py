@@ -14,12 +14,13 @@ os.environ["SCARF_NO_ANALYTICS"]="true"
 os.environ["NLTK_DATA"]="./nltk_data"
 
 @st.cache_resource
-def initialize_rag_application(vector_store_path, embedding_model_name, temperature, max_new_tokens, top_p):
+def initialize_rag_application(vector_database, vector_store_path, embedding_model_name, temperature, max_new_tokens, top_p):
     """
     Initializes and caches the RAGApplication object.
     """
     return RAGApplication(
         embedding_model_name=embedding_model_name,
+        vector_database=vector_database,
         vector_store_path=vector_store_path,
         temperature=temperature,
         max_new_tokens=max_new_tokens,
@@ -95,12 +96,12 @@ def main():
         # # Database Selection
         # with st.expander(label="Database Selection:", expanded=False):
         #     vector_database = st.selectbox("Database:", ["ChromaDB", "FAISS"], help="Default database set to ChromaDB")
-        #     vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage")
+        #     vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage storage used only with ChromaDB.")
 
         # Database Selection
         with st.expander(label="Database Selection:", expanded=False):
             vector_database = st.selectbox("Database:", ["FAISS", "ChromaDB"], help="Default database set to FAISS")
-            vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage (only for ChromaDB)")
+            vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage used only with ChromaDB.")
 
         # Model Selection
         with st.expander(label="Model Selection:", expanded=False):
@@ -150,6 +151,7 @@ def main():
             try:
                 # Initialize RAG application
                 rag = initialize_rag_application(
+                    vector_database,
                     vector_store_path,
                     embedding_model_name,
                     temperature,
@@ -205,13 +207,68 @@ def main():
                     for doc in entry["source_documents"]:
                         metadata = doc.metadata
                         st.write(f"**Source:** {metadata.get('source', 'Unknown')}, "
-                                 f"**Page Number:** {metadata.get('page_number', 'N/A')}")
+                                f"**Page Number:** {metadata.get('page_number', 'N/A')}")
+
+            # # Add a download button for conversation history
+            # if st.session_state.conversation:
+            #     conversation_str = "\n\n".join(
+            #         [f"Q: {entry['question']}\nA: {entry['answer']}\nTimestamp: {entry['timestamp']}" for entry in st.session_state.conversation]
+            #     )
+            #     conversation_bytes = conversation_str.encode("utf-8")
+            #     st.download_button(
+            #         label="Download Conversation History",
+            #         data=conversation_bytes,
+            #         file_name="conversation_history.txt",
+            #         mime="text/plain"
+            #     )
+
+            # Custom CSS for the download button
+            download_button_style = """
+                <style>
+                .download-button {
+                    background-color: white;
+                    color: black;
+                    font-size: 16px;
+                    font-weight: normal;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    border: 1px solid #d3d3d3;
+                    cursor: pointer;
+                    text-align: center;
+                    max-width: 255px;
+                    margin: 0;
+                    display: block;
+                    text-decoration: none; /* removes underline */
+                }
+                .download-button:hover {
+                    background-color: #dcdcdc;
+                    text-decoration: none; /* prevent underline on hover */
+                }
+                </style>
+            """
+            st.markdown(download_button_style, unsafe_allow_html=True)
+
+            # Add a download button for conversation history
+            if st.session_state.conversation:
+                conversation_str = "\n\n".join(
+                    [f"Q: {entry['question']}\nA: {entry['answer']}\nTimestamp: {entry['timestamp']}" for entry in st.session_state.conversation]
+                )
+                conversation_bytes = conversation_str.encode("utf-8")
+                st.markdown(
+                    f"""
+                    <a href="data:text/plain;base64,{base64.b64encode(conversation_bytes).decode()}" download="conversation_history.txt" class="download-button">
+                        Download Conversation History
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
 
     # Process documents on submission
     if st.sidebar.button("Submit & Process"):
         try:
             # Initialize RAG application
             rag = initialize_rag_application(
+                vector_database,
                 vector_store_path,
                 embedding_model_name,
                 temperature,

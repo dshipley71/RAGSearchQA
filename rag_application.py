@@ -24,7 +24,7 @@ class RAGApplication:
     vector storage, and conversational AI workflows.
     """
 
-    def __init__(self, embedding_model_name, vector_store_path, temperature, max_new_tokens, top_p):
+    def __init__(self, embedding_model_name, vector_database, vector_store_path, temperature, max_new_tokens, top_p):
         """
         Initializes the RAG application with the specified parameters.
 
@@ -36,6 +36,7 @@ class RAGApplication:
             top_p (float): Top-p sampling for controlling diversity in generation.
         """
         self.embedding_model_name = embedding_model_name
+        self.vector_database = vector_database
         self.vector_store_path = vector_store_path
         self.vector_store = None  # Cache for vector store optimization
         self.temperature = temperature
@@ -96,7 +97,7 @@ class RAGApplication:
         ]
         return chunks
 
-    def store_vector_data(self, text_chunks, embedding_model_name=None, database="FAISS"):
+    def store_vector_data(self, text_chunks, embedding_model_name=None):
         """
         Stores text chunks in a vector store for later retrieval.
 
@@ -116,13 +117,13 @@ class RAGApplication:
             encode_kwargs={"normalize_embeddings": True}
         )
         
-        if database == "FAISS":
+        if self.vector_database == "FAISS":
             vector_store = FAISS.from_documents(
                 documents=filter_complex_metadata(text_chunks),
                 embedding=embeddings
             )
             self.vector_store = vector_store  # Cache the vector store
-        elif database == "ChromaDB":
+        elif self.vector_database == "ChromaDB":
             vector_store = Chroma.from_documents(
                 documents=filter_complex_metadata(text_chunks),
                 embedding=embeddings,
@@ -132,7 +133,7 @@ class RAGApplication:
         else:
             raise ValueError(f"Unsupported database: {database}")
 
-    def load_vector_store(self, database="FAISS"):
+    def load_vector_store(self):
         """
         Loads the vector store from the specified path or in-memory.
 
@@ -144,9 +145,9 @@ class RAGApplication:
         """
         if self.vector_store is None:
             embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model_name)
-            if database == "FAISS":
+            if self.vector_database == "FAISS":
                 raise RuntimeError("FAISS is in-memory only and must be initialized with data.")
-            elif database == "ChromaDB":
+            elif self.vector_database == "ChromaDB":
                 self.vector_store = Chroma(
                     persist_directory=self.vector_store_path,
                     embedding_function=embeddings
