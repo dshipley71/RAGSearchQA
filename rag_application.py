@@ -14,6 +14,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM, BitsAndB
 from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
 from langchain_unstructured import UnstructuredLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
+from langchain_community.vectorstores import FAISS
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -95,13 +96,14 @@ class RAGApplication:
         ]
         return chunks
 
-    def store_vector_data(self, text_chunks, embedding_model_name=None):
+    def store_vector_data(self, text_chunks, embedding_model_name=None, database="FAISS"):
         """
         Stores text chunks in a vector store for later retrieval.
 
         Args:
             text_chunks (list): List of Document objects containing text chunks.
             embedding_model_name (str, optional): Name of the embedding model to use. Defaults to None.
+            database (str): The vector database to use. Either 'FAISS' or 'ChromaDB'. Defaults to 'FAISS'.
 
         Returns:
             None
@@ -110,29 +112,47 @@ class RAGApplication:
             self.embedding_model_name = embedding_model_name
         embeddings = HuggingFaceEmbeddings(
             model_name=self.embedding_model_name,
-            model_kwargs = {"device": device},
-            encode_kwargs = {"normalize_embeddings": True}
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True}
         )
-        vector_store = Chroma.from_documents(
-            documents=filter_complex_metadata(text_chunks),
-            embedding=embeddings,
-            persist_directory=self.vector_store_path
-        )
-        self.vector_store = vector_store  # Cache the vector store
+        
+        if database == "FAISS":
+            vector_store = FAISS.from_documents(
+                documents=filter_complex_metadata(text_chunks),
+                embedding=embeddings
+            )
+            self.vector_store = vector_store  # Cache the vector store
+        elif database == "ChromaDB":
+            vector_store = Chroma.from_documents(
+                documents=filter_complex_metadata(text_chunks),
+                embedding=embeddings,
+                persist_directory=self.vector_store_path
+            )
+            self.vector_store = vector_store  # Cache the vector store
+        else:
+            raise ValueError(f"Unsupported database: {database}")
 
-    def load_vector_store(self):
+    def load_vector_store(self, database="FAISS"):
         """
-        Loads the vector store from the specified path.
+        Loads the vector store from the specified path or in-memory.
+
+        Args:
+            database (str): The vector database to load. Either 'FAISS' or 'ChromaDB'. Defaults to 'FAISS'.
 
         Returns:
-            Chroma: The loaded vector store.
+            VectorStore: The loaded vector store.
         """
         if self.vector_store is None:
             embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model_name)
-            self.vector_store = Chroma(
-                persist_directory=self.vector_store_path,
-                embedding_function=embeddings
-            )
+            if database == "FAISS":
+                raise RuntimeError("FAISS is in-memory only and must be initialized with data.")
+            elif database == "ChromaDB":
+                self.vector_store = Chroma(
+                    persist_directory=self.vector_store_path,
+                    embedding_function=embeddings
+                )
+            else:
+                raise ValueError(f"Unsupported database: {database}")
         return self.vector_store
 
     def save_conversation(self, conversation):
@@ -199,6 +219,7 @@ class RAGApplication:
             pipe = pipeline(
                 "text-generation",
                 model=model,
+                device=device,
                 tokenizer=tokenizer,
                 max_new_tokens=self.max_new_tokens,
                 temperature=self.temperature,

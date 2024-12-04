@@ -92,10 +92,15 @@ def main():
         # Custom title with adjusted font size
         st.markdown('<div class="custom-settings-title">Settings</div>', unsafe_allow_html=True)
 
+        # # Database Selection
+        # with st.expander(label="Database Selection:", expanded=False):
+        #     vector_database = st.selectbox("Database:", ["ChromaDB", "FAISS"], help="Default database set to ChromaDB")
+        #     vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage")
+
         # Database Selection
         with st.expander(label="Database Selection:", expanded=False):
-            vector_database = st.selectbox("Database:", ["ChromaDB", "FAISS"], help="Default database set to ChromaDB")
-            vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage")
+            vector_database = st.selectbox("Database:", ["FAISS", "ChromaDB"], help="Default database set to FAISS")
+            vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage (only for ChromaDB)")
 
         # Model Selection
         with st.expander(label="Model Selection:", expanded=False):
@@ -177,6 +182,7 @@ def main():
                     # Display response
                     st.write("Reply: ", result)
                     st.write(f"**LLM Model:** {llm_model}")
+                    st.write(f"**Vector Database:** {vector_database}")
                     st.write("### Source Documents")
                     for doc in source_documents:
                         metadata = doc.metadata
@@ -224,7 +230,8 @@ def main():
                         text_chunks = (
                             rag.get_chunks(raw_documents, chunk_size, chunk_overlap) if chunk_text else raw_documents
                         )
-                        rag.store_vector_data(text_chunks)
+                        # rag.store_vector_data(text_chunks)
+                        rag.store_vector_data(text_chunks, database=vector_database)
                         st.sidebar.success("Documents processed and stored successfully.")
 
         except Exception as e:

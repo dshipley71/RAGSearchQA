@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.11
+  - faiss
   - poppler
   - tesseract
   - pip
@@ -11,6 +12,7 @@ dependencies:
       - accelerate
       - bitsandbytes
       - chromadb
+      - faiss-gpu-cu12
       - langchain
       - langchain-chroma
       - langchain-community
