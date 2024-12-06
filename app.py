@@ -288,7 +288,7 @@ def main():
                             rag.get_chunks(raw_documents, chunk_size, chunk_overlap) if chunk_text else raw_documents
                         )
                         # rag.store_vector_data(text_chunks)
-                        rag.store_vector_data(text_chunks, database=vector_database)
+                        rag.store_vector_data(text_chunks)
                         st.sidebar.success("Documents processed and stored successfully.")
 
         except Exception as e:
