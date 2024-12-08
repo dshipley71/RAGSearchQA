@@ -76,7 +76,10 @@ def main():
     st.sidebar.title("System Prompt")
     system_prompt = st.sidebar.text_area(
         label="Customize your prompt:",
-        value="You are a helpful assistant. Answer the question as detailed as possible from the provided context. "
+        # value="You are a helpful assistant. Answer the question as detailed as possible from the provided context. "
+        #       "If the answer is not in the provided context, just say, 'answer is not available in the context'.",
+        value="You are a Human Ressource Manager hiring for a technical firm. You are reviewing applicant resumes to determine if they are a good candidate for your company."
+              "Answer questions as detailed as possible from the provided context. Provide as much detail as possible, such as applicant name, schools, degrees earned, and techical skills."
               "If the answer is not in the provided context, just say, 'answer is not available in the context'.",
         height=150
     )

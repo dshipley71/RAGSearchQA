@@ -15,6 +15,7 @@ from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
 from langchain_unstructured import UnstructuredLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_community.vectorstores import FAISS
+from unstructured.cleaners.core import clean_extra_whitespace, group_broken_paragraphs
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -64,7 +65,15 @@ class RAGApplication:
                 tmp_file_path = tmp_file.name
 
             try:
-                loader = UnstructuredLoader(tmp_file_path)
+                loader = UnstructuredLoader(
+                    tmp_file_path,
+                    chunking_strategy="basic", #"by_title", #"basic",
+                    max_characters=16384,
+                    overlap=256,
+                    overlap_all=True,
+                    include_orig_elements=False,
+                    post_processors=[clean_extra_whitespace, group_broken_paragraphs],
+                )
                 docs = loader.load()
                 for doc in docs:
                     doc.metadata["source"] = file.name
@@ -90,11 +99,21 @@ class RAGApplication:
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
-        chunks = [
-            Document(page_content=split_text, metadata=text.metadata)
-            for text in texts
-            for split_text in text_splitter.split_text(text.page_content)
-        ]
+
+        # chunks = [
+        #     Document(page_content=split_text, metadata=text.metadata)
+        #     for text in texts
+        #     for split_text in text_splitter.split_text(text.page_content)
+        # ]
+
+        chunks = []
+
+        for text in texts:
+            split_texts = text_splitter.split_text(text.page_content)
+            for split_text in split_texts:
+                chunk = Document(page_content=split_text, metadata=text.metadata)
+                chunks.append(chunk)
+
         return chunks
 
     def store_vector_data(self, text_chunks, embedding_model_name=None):
