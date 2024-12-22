@@ -238,7 +238,7 @@ class RAGApplication:
             
             model = AutoModelForCausalLM.from_pretrained(
                 llm_model,
-                # quantization_config=bnb_config
+                quantization_config=bnb_config,
                 local_files_only=True,
                 low_cpu_mem_usage=True
             ).to(device)
@@ -246,7 +246,7 @@ class RAGApplication:
             pipe = pipeline(
                 "text-generation",
                 model=model,
-                device=device,
+                # device=device,
                 tokenizer=tokenizer,
                 max_new_tokens=self.max_new_tokens,
                 temperature=self.temperature,
