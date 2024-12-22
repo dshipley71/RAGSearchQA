@@ -19,12 +19,16 @@ from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_community.vectorstores import FAISS
 from unstructured.cleaners.core import clean_extra_whitespace, group_broken_paragraphs
 
+from langchain_community.llms import VLLM
+
 from pprint import pprint
 from langchain.globals import set_debug
 
 set_debug(False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+USE_VLLM = False
 
 class RAGApplication:
     """
@@ -224,38 +228,57 @@ class RAGApplication:
         Returns:
             HuggingFacePipeline: A cached pipeline for text generation.
         """
-        if self.cached_llm is None:
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype= "bfloat16"
+        if USE_VLLM:
+            self.cached_llm = VLLM(
+                model = llm_model,
+                #enforce_eager=True,
+                #dtype=torch.bfloat16,
+                gpu_memory_utilizaation=1,
+                quantization="bitsandbytes",
+                max_model_len=32768,
+                #seed=415,
+                #maqx_num_batched_tokens=3000,
+                temperature=0.1,
+                top_p=0.95,
+                top_k=5,
+                max_new_tokens=8192,
+                #tensor_parallel_size=1;
+                #eos_token=terminators,
             )
-            tokenizer = AutoTokenizer.from_pretrained(
-                llm_model,
-                local_files_only=True,
-            )
-            
-            model = AutoModelForCausalLM.from_pretrained(
-                llm_model,
-                quantization_config=bnb_config,
-                local_files_only=True,
-                low_cpu_mem_usage=True
-            ).to(device)
-            
-            pipe = pipeline(
-                "text-generation",
-                model=model,
-                # device=device,
-                tokenizer=tokenizer,
-                max_new_tokens=self.max_new_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p,
-                repetition_penalty=1.15,
-                return_full_text=False,
-            )
-            
-            self.cached_llm = HuggingFacePipeline(pipeline=pipe)
+        else:
+            if self.cached_llm is None:
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype= "bfloat16"
+                )
+                tokenizer = AutoTokenizer.from_pretrained(
+                    llm_model,
+                    local_files_only=True,
+                )
+                
+                model = AutoModelForCausalLM.from_pretrained(
+                    llm_model,
+                    quantization_config=bnb_config,
+                    local_files_only=True,
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True
+                ).to(device)
+                
+                pipe = pipeline(
+                    "text-generation",
+                    model=model,
+                    # device=device,
+                    tokenizer=tokenizer,
+                    max_new_tokens=self.max_new_tokens,
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                    repetition_penalty=1.15,
+                    return_full_text=False,
+                )
+                
+                self.cached_llm = HuggingFacePipeline(pipeline=pipe)
         return self.cached_llm
 
     def format_docs(self, docs):
