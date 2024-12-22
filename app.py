@@ -5,6 +5,7 @@ from PIL import Image
 import streamlit as st
 from datetime import datetime
 from rag_application import RAGApplication
+from pprint import pprint
 
 # disable telemetry
 os.environ["ANONYMIZED_TELEMETRY"]="False"
@@ -72,15 +73,20 @@ def main():
     # Sidebar: Image
     st.sidebar.image("assets/ai_sidebar.jpg")
 
+    prompt = """ You are a helpful assistant. Answer the question as detailed as possible from
+the provided context and conversation history. If the answer is not in the provided context, just say,
+'answer is not available in the context'.
+Context: {context}
+Question: {question}
+"""
+
     # Sidebar: System Prompt
     st.sidebar.title("System Prompt")
     system_prompt = st.sidebar.text_area(
         label="Customize your prompt:",
         # value="You are a helpful assistant. Answer the question as detailed as possible from the provided context. "
         #       "If the answer is not in the provided context, just say, 'answer is not available in the context'.",
-        value="You are a Human Ressource Manager hiring for a technical firm. You are reviewing applicant resumes to determine if they are a good candidate for your company."
-              "Answer questions as detailed as possible from the provided context. Provide as much detail as possible, such as applicant name, schools, degrees earned, and techical skills."
-              "If the answer is not in the provided context, just say, 'answer is not available in the context'.",
+        value=prompt,
         height=150
     )
 
@@ -96,40 +102,33 @@ def main():
         # Custom title with adjusted font size
         st.markdown('<div class="custom-settings-title">Settings</div>', unsafe_allow_html=True)
 
-        # # Database Selection
-        # with st.expander(label="Database Selection:", expanded=False):
-        #     vector_database = st.selectbox("Database:", ["ChromaDB", "FAISS"], help="Default database set to ChromaDB")
-        #     vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage storage used only with ChromaDB.")
-
         # Database Selection
         with st.expander(label="Database Selection:", expanded=False):
-            vector_database = st.selectbox("Database:", ["FAISS", "ChromaDB"], help="Default database set to FAISS")
+            vector_database = st.selectbox("Database:", ["ChromaDB", "FAISS"], help="Default database set to FAISS")
             vector_store_path = st.text_input("Vector Store Path", "data/vectorstore/my_store", help="Path to vector database storage used only with ChromaDB.")
 
         # Model Selection
         with st.expander(label="Model Selection:", expanded=False):
-            embedding_model_name = st.selectbox("Embedding Model", ["all-MiniLM-L6-v2", "multilingual-e5-large"], help="Default set to all-MiniLM-L6-v2")
-            vlm_model = st.selectbox("Vision Language Model:", ["Llama-3.2-11B-Vision-Instruct", "Phi-3.5-vision-instruct"], help="Default set to Llama-3.2-11B-Vision-Instruct")
-            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Meta-Llama-3.1-70B-Instruct-AWQ-INT4"], help="Default set to Llama-3.2-3B-Instruct")
+            embedding_model_name = st.selectbox("Embedding Model", ["multilingual-e5-large", "all-MiniLM-L6-v2"], help="Default set to multilingual-e5-large")
+            # vlm_model = st.selectbox("Vision Language Model:", ["Llama-3.2-11B-Vision-Instruct"], help="Default set to Llama-3.2-11B-Vision-Instruct")
+            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct"], help="Default set to Llama-3.2-3B-Instruct")
             
             embedding_model_name = "models/" + embedding_model_name
-            vlm_model = "models/" + vlm_model
+            # vlm_model = "models/" + vlm_model
             llm_model = "models/" + llm_model
 
         # Document Settings
         with st.expander(label="Document Settings:", expanded=False):
             chunk_text = st.checkbox("Chunk Text", value=True)
-            chunk_size = st.number_input("Chunk Size", min_value=100, max_value=2000, value=1000, step=100)
-            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, max_value=500, value=200, step=50)
+            chunk_size = st.number_input("Chunk Size", min_value=100, max_value=2000, value=1024, step=100)
+            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, max_value=500, value=int(chunk_size/10), step=50)
             num_docs = st.number_input("Number of Documents to Retrieve", min_value=1, max_value=10, value=5, step=1)
 
         # LLM Settings
         with st.expander(label="LLM Settings:", expanded=False):
-            max_new_tokens = st.number_input("Max New Tokens", min_value=50, max_value=65536, value=32768, step=50)
+            max_new_tokens = st.number_input("Max New Tokens", min_value=50, max_value=65536, value=8192, step=50)
             temperature = st.number_input("Temperature", min_value=0.0, max_value=2.0, value=0.1, step=0.01)
-#            temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.1, step=0.01)
             top_p = st.number_input("Top P", min_value=0.0, max_value=1.0, value=0.95, step=0.01)
-#            top_p = st.slider("Top P", min_value=0.0, max_value=1.0, value=0.95, step=0.01)
 
     # Main Content Area
     with col2:
@@ -166,15 +165,17 @@ def main():
                 if not hasattr(st.session_state, "vector_store"):
                     st.session_state.vector_store = rag.load_vector_store()
 
-                retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": num_docs})
+                # TODO update system prompt to include conversation history
+
                 response = rag.get_conversational_chain(
-                    retriever, user_question, llm_model, system_prompt
+                    user_question, llm_model, system_prompt
                 )
 
                 # Process response
-                if response and "result" in response:
-                    result = response["result"]
-                    source_documents = response.get("source_documents", [])
+                # if response and "result" in response:
+                if response and "answer" in response:
+                    result = response["answer"]
+                    source_documents = response.get("context", [])
 
                     # Update conversation history
                     st.session_state.conversation.append({
@@ -191,8 +192,9 @@ def main():
                     st.write("### Source Documents")
                     for doc in source_documents:
                         metadata = doc.metadata
-                        st.write(f"**Source:** {metadata.get('source', 'Unknown')}, "
-                                 f"**Page Number:** {metadata.get('page_number', 'N/A')}")
+                        st.write(f"**Source:** {metadata.get('source', 'Unknown')} | "
+                                 f"**Page Number:** {metadata.get('page_number', 'N/A')} | "
+                                 f"**File Type:** {metadata.get('filetype', 'N/A')}")
 
                 else:
                     st.error("No result found. Please try again.")
@@ -209,8 +211,9 @@ def main():
                     st.write("### Source Documents")
                     for doc in entry["source_documents"]:
                         metadata = doc.metadata
-                        st.write(f"**Source:** {metadata.get('source', 'Unknown')}, "
-                                f"**Page Number:** {metadata.get('page_number', 'N/A')}")
+                        st.write(f"**Source:** {metadata.get('source', 'Unknown')} | "
+                                 f"**Page Number:** {metadata.get('page_number', 'N/A')} | "
+                                 f"**File Type:** {metadata.get('filetype', 'N/A')}")
 
             # # Add a download button for conversation history
             # if st.session_state.conversation:

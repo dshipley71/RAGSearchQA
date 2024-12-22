@@ -2,20 +2,27 @@ import os
 import json
 import tempfile
 import torch
+
 from datetime import datetime
-from PyPDF2 import PdfReader
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
+
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
+from langchain_huggingface import HuggingFacePipeline
 from langchain_unstructured import UnstructuredLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_community.vectorstores import FAISS
 from unstructured.cleaners.core import clean_extra_whitespace, group_broken_paragraphs
+
+from pprint import pprint
+from langchain.globals import set_debug
+
+set_debug(False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -251,7 +258,11 @@ class RAGApplication:
             self.cached_llm = HuggingFacePipeline(pipeline=pipe)
         return self.cached_llm
 
-    def get_conversational_chain(self, retriever, ques, llm_model, system_prompt):
+    def format_docs(self, docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+    
+    # def get_conversational_chain(self, retriever, ques, llm_model, system_prompt):
+    def get_conversational_chain(self, ques, llm_model, system_prompt):
         """
         Generates a conversational chain response using an LLM and retriever.
 
@@ -264,16 +275,41 @@ class RAGApplication:
         Returns:
             dict: The response from the conversational chain, including source documents.
         """
-        chatllm = self.initialize_llm(llm_model)
-        llm = ChatHuggingFace(llm=chatllm)
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}")
-        ])
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
-            return_source_documents=True
+        llm = self.initialize_llm(llm_model)
+
+        retriever = self.vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={
+                "k": 5,
+            }
         )
-        return qa_chain.invoke({"query": ques})
+
+        prompt = PromptTemplate(
+            template = system_prompt,
+            input_variables=["context", "question", "history"],
+        )
+        # pprint(prompt)
+
+        qa_chain_from_docs = (
+            RunnablePassthrough.assign(context=(lambda x: self.format_docs(x["context"])))
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+
+        qa_chain_with_source = RunnableParallel(
+            {
+                "context": retriever,
+                "question": RunnablePassthrough()
+            }
+        ).assign(answer=qa_chain_from_docs)
+
+        answer = qa_chain_with_source.invoke(ques)
+        # pprint(answer)
+
+        sources = answer["context"]
+
+        # for index, source in enumerate(sources):
+        #     print(f"{index}: source: {source.metadata['source']} | Page number: {source.metadata['page_number']} | File Type: {source.metadata['filetype']}")
+        
+        return answer
