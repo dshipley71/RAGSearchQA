@@ -12,7 +12,9 @@ dependencies:
       - accelerate
       - bitsandbytes
       - chromadb
+      - chroma-haystack
       - faiss-gpu-cu12
+      - haystack-ai
       - langchain
       - langchain-chroma
       - langchain-community
@@ -30,4 +32,6 @@ dependencies:
       - torchaudio
       - transformers
       - unstructured[all-docs]
+      - unstructured-haystack
       - vllm
+      - vllm-haystack
