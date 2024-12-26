@@ -29,7 +29,10 @@ set_debug(False)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # models to use with vLLM instead of hf transformers
-USE_VLLM = ["models/Qwen2.5-0.5B"]
+USE_VLLM = [
+    "models/Qwen2.5-0.5B",
+    "models/Llama-3.2-11B-Vision-Instruct"
+]
 
 class RAGApplication:
     """
