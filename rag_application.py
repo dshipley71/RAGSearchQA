@@ -28,7 +28,8 @@ set_debug(False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-USE_VLLM = False
+# models to use with vLLM instead of hf transformers
+USE_VLLM = ["models/Qwen2.5-0.5B"]
 
 class RAGApplication:
     """
@@ -228,24 +229,22 @@ class RAGApplication:
         Returns:
             HuggingFacePipeline: A cached pipeline for text generation.
         """
-        if USE_VLLM:
+        if llm_model in USE_VLLM:
+            print("====> Using vLLM engine")
             self.cached_llm = VLLM(
                 model = llm_model,
-                #enforce_eager=True,
-                #dtype=torch.bfloat16,
-                gpu_memory_utilizaation=1,
+                gpu_memory_utilization=0.9,
                 quantization="bitsandbytes",
-                max_model_len=32768,
-                #seed=415,
-                #maqx_num_batched_tokens=3000,
+                max_model_len=8192,
                 temperature=0.1,
                 top_p=0.95,
                 top_k=5,
                 max_new_tokens=8192,
-                #tensor_parallel_size=1;
+                tensor_parallel_size=1,
                 #eos_token=terminators,
             )
         else:
+            print("====> Using HuggingFace transformers")
             if self.cached_llm is None:
                 bnb_config = BitsAndBytesConfig(
                     load_in_4bit=True,

@@ -111,7 +111,7 @@ Question: {question}
         with st.expander(label="Model Selection:", expanded=False):
             embedding_model_name = st.selectbox("Embedding Model", ["multilingual-e5-large", "all-MiniLM-L6-v2"], help="Default set to multilingual-e5-large. If performance is slow for single GPU usage, use all-MiniLM-L6-v2.")
             # vlm_model = st.selectbox("Vision Language Model:", ["Llama-3.2-11B-Vision-Instruct"], help="Default set to Llama-3.2-11B-Vision-Instruct")
-            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct"], help="Default set to Llama-3.2-3B-Instruct")
+            llm_model = st.selectbox("Large Language Model", ["Llama-3.2-3B-Instruct", "Qwen2.5-0.5B"], help="Default set to Llama-3.2-3B-Instruct")
             
             embedding_model_name = "models/" + embedding_model_name
             # vlm_model = "models/" + vlm_model
