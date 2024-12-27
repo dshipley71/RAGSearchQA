@@ -28,7 +28,7 @@ from haystack.components.builders import PromptBuilder
 from haystack.components.builders import AnswerBuilder
 from haystack.components.generators import HuggingFaceLocalGenerator
 
-from transformers import AutoConfig, BitsAndBytesConfig
+from transformers import BitsAndBytesConfig
 
 ###############################################################################
 #
@@ -269,9 +269,6 @@ class RAGApplication:
         """
         Retrieval Augmented Generation pipeline.
         """
-        # config = AutoConfig.from_pretrained(self.llm_model)
-
-
         llm = HuggingFaceLocalGenerator(
             model=self.llm_model,
             task=self.task,
