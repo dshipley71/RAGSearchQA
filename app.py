@@ -4,7 +4,7 @@ import base64
 from PIL import Image
 import streamlit as st
 from datetime import datetime
-from rag_application import RAGApplication
+from rag_app_langchain import RAGApplication
 from pprint import pprint
 
 # disable telemetry
