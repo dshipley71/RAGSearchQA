@@ -11,6 +11,7 @@ import io
 from PIL import Image
 from pathlib import Path
 from pprint import pprint
+
 from haystack import Pipeline
 from haystack.utils import ComponentDevice
 from haystack.document_stores.types import DuplicatePolicy
@@ -26,6 +27,7 @@ from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.builders import PromptBuilder
 from haystack.components.builders import AnswerBuilder
 from haystack.components.generators import HuggingFaceLocalGenerator
+
 from transformers import AutoConfig, BitsAndBytesConfig
 
 ###############################################################################
