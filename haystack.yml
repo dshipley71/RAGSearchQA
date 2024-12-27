@@ -1,10 +1,9 @@
-name: myrag
+name: haystack
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.11
-  - faiss
   - poppler
   - tesseract
   - pip
@@ -13,14 +12,7 @@ dependencies:
       - bitsandbytes
       - chromadb
       - chroma-haystack
-      - faiss-gpu-cu12
       - haystack-ai
-      - langchain
-      - langchain-chroma
-      - langchain-community
-      - langchain-core
-      - langchain-huggingface
-      - langchain-unstructured[local]
       - libmagic
       - pillow
       - pypdf2
