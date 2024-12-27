@@ -364,5 +364,4 @@ def run_pipeline(question):
     rag.run_rag(question)
 
 if __name__ == "__main__":
-    run_pipeline("Elaborate on the Multi-Armed Bandit problem?")    
-
+    run_pipeline("Elaborate on the Multi-Armed Bandit problem?")
