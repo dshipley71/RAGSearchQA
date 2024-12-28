@@ -40,7 +40,7 @@ device ="cuda" if torch.cuda.is_available() else "cpu"
 ###############################################################################
 # utilities
 ###############################################################################
-def check_directory(path):
+def check_directory(path: str):
     """
     Check if a directory exists.
 
@@ -265,102 +265,137 @@ class RAGApplication:
         except Exception as e:
             print(f"Error during embedding: {e}")
 
-    def run_rag(self, question):
+    def run_rag(self, question: str):
         """
         Retrieval Augmented Generation pipeline.
         """
-        llm = HuggingFaceLocalGenerator(
-            model=self.llm_model,
-            task=self.task,
-            huggingface_pipeline_kwargs={
-                "device_map": device,
-                "torch_dtype": torch.bfloat16,
-                "model_kwargs": {
-                    "quantization_config": self.bnb_config,
+        try:
+            llm = HuggingFaceLocalGenerator(
+                model=self.llm_model,
+                task=self.task,
+                huggingface_pipeline_kwargs={
+                    "device_map": device,
+                    "torch_dtype": torch.bfloat16,
+                    "model_kwargs": {
+                        "quantization_config": self.bnb_config,
+                    },
                 },
-            },
-            generation_kwargs={
-                "max_new_tokens": self.max_new_tokens,
-                "temperature": self.temperature,
-                "top_k": self.top_k,
-                "top_p": self.top_p,
-                "repetition_penalty": self.repetition_penalty,
-                "return_full_text": self.return_full_text,
-            },
-        )
-
-        llm.warm_up()
-
-        # quick check
-        # rich.print(llm.run("What is the capital of Virgina?"))
-
-        # create components
-        embedder = SentenceTransformersTextEmbedder(
-            model=self.embedding_model,
-            device=ComponentDevice.from_str(device)
-        )
-
-        retriever = ChromaEmbeddingRetriever(
-            document_store=self.document_store
-        )
-
-        prompt_builder = PromptBuilder(
-            template=self.template
-        )
-
-        answer_builder = AnswerBuilder()
-
-        # add components to rag pipeline
-        rag_pipeline = Pipeline()
-        rag_pipeline.add_component(instance=embedder, name="embedder")
-        rag_pipeline.add_component(instance=retriever, name="retriever")
-        rag_pipeline.add_component(instance=prompt_builder, name="prompt_builder")
-        rag_pipeline.add_component(instance=answer_builder, name="answer_builder")
-        rag_pipeline.add_component(instance=llm, name="llm")
-
-        # connect rag components
-        rag_pipeline.connect("embedder.embedding", "retriever.query_embedding")
-        rag_pipeline.connect("retriever", "prompt_builder.documents")
-        rag_pipeline.connect("prompt_builder", "llm")
-        # rag_pipeline.connect("llm.meta", "answer_builder.replies") # TODO: add metadata when preprocessing documentation
-        rag_pipeline.connect("llm.replies", "answer_builder.replies")
-        rag_pipeline.connect("retriever", "answer_builder.documents")
-
-        # run rag pipeline
-        results = rag_pipeline.run(
-            {
-                "embedder": {
-                    "text": question
+                generation_kwargs={
+                    "max_new_tokens": self.max_new_tokens,
+                    "temperature": self.temperature,
+                    "top_k": self.top_k,
+                    "top_p": self.top_p,
+                    "repetition_penalty": self.repetition_penalty,
+                    "return_full_text": self.return_full_text,
                 },
-                "prompt_builder": {
-                    "question": question
-                },
-                "answer_builder": {
-                    "query": question
-                },
-                "llm": {
-                    # "generation_kwargs": {
-                    #     "max_new_tokens": 500,
-                    #     "temperature": 0.1,
-                    #     "top_k": 5,
-                    #     "top_p": 0.95,
-                    #     "repetition_penalty": 1.15,
-                    #     "return_full_text": False,
-                    # },
+            )
+
+            llm.warm_up()
+
+            # quick check
+            # rich.print(llm.run("What is the capital of Virgina?"))
+
+            # create components
+            embedder = SentenceTransformersTextEmbedder(
+                model=self.embedding_model,
+                device=ComponentDevice.from_str(device)
+            )
+
+            retriever = ChromaEmbeddingRetriever(
+                document_store=self.document_store
+            )
+
+            prompt_builder = PromptBuilder(
+                template=self.template
+            )
+
+            answer_builder = AnswerBuilder()
+
+            # add components to rag pipeline
+            rag_pipeline = Pipeline()
+            rag_pipeline.add_component(instance=embedder, name="embedder")
+            rag_pipeline.add_component(instance=retriever, name="retriever")
+            rag_pipeline.add_component(instance=prompt_builder, name="prompt_builder")
+            rag_pipeline.add_component(instance=answer_builder, name="answer_builder")
+            rag_pipeline.add_component(instance=llm, name="llm")
+
+            # connect rag components
+            rag_pipeline.connect("embedder.embedding", "retriever.query_embedding")
+            rag_pipeline.connect("retriever", "prompt_builder.documents")
+            rag_pipeline.connect("prompt_builder", "llm")
+            # rag_pipeline.connect("llm.meta", "answer_builder.replies") # TODO: add metadata when preprocessing documentation
+            rag_pipeline.connect("llm.replies", "answer_builder.replies")
+            rag_pipeline.connect("retriever", "answer_builder.documents")
+
+            # run rag pipeline
+            results = rag_pipeline.run(
+                {
+                    "embedder": {
+                        "text": question
+                    },
+                    "prompt_builder": {
+                        "question": question
+                    },
+                    "answer_builder": {
+                        "query": question
+                    },
+                    "llm": {
+                        # "generation_kwargs": {
+                        #     "max_new_tokens": 500,
+                        #     "temperature": 0.1,
+                        #     "top_k": 5,
+                        #     "top_p": 0.95,
+                        #     "repetition_penalty": 1.15,
+                        #     "return_full_text": False,
+                        # },
+                    }
                 }
-            }
-        )
+            )
 
-        rich.print(results)
+            # Extracting the requested information
+            def extract_information(data):
+                result = {
+                    "Answer": data['answer_builder']['answers'][0].data.strip(),
+                    "Query": data['answer_builder']['answers'][0].query.strip(),
+                    "Source": []
+                }
+                
+                documents = data['answer_builder']['answers'][0].documents
 
-def run_pipeline(question):
+                if documents:
+                    for doc in documents:
+                        source_info = {
+                            "file_path": doc.meta['file_path'],
+                            "page_number": doc.meta['page_number'],
+                            "score": doc.score,
+                            "content": doc.content.strip()
+                        }
+                        result["Source"].append(source_info)
+                else:
+                    result["Source"] = "No documents available"
+                
+                return result
+
+            # Extracting and printing the information
+            extracted_info = extract_information(results)
+            #pprint(extracted_info)
+
+            return extracted_info
+
+        except Exception as e:
+            print(f"Error in RAG pipeline: {e}")
+
+def run_pipeline(question: str):
     """
     Run RAG pipeline
     """
     rag = RAGApplication()
     rag.create_document_store()
     rag.run_embedder()
-    rag.run_rag(question)
+    results = rag.run_rag(question)
 
+    return results
 if __name__ == "__main__":
-    run_pipeline("Elaborate on the Multi-Armed Bandit problem?")
+    results = run_pipeline("Elaborate on the Multi-Armed Bandit problem?")
+
+    pprint(results)
