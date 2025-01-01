@@ -25,5 +25,6 @@ dependencies:
       - transformers
       - unstructured[all-docs]
       - unstructured-haystack
+      - unstructured-fileconverter-haystack
       - vllm
       - vllm-haystack

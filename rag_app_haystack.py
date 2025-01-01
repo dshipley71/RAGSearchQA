@@ -1,6 +1,3 @@
-###############################################################################
-#
-###############################################################################
 import os
 import torch
 import rich
@@ -11,6 +8,8 @@ import io
 from PIL import Image
 from pathlib import Path
 from pprint import pprint
+
+from typing import List
 
 from haystack import Pipeline
 from haystack.utils import ComponentDevice
@@ -29,10 +28,6 @@ from haystack.components.builders import AnswerBuilder
 from haystack.components.generators import HuggingFaceLocalGenerator
 
 from transformers import BitsAndBytesConfig
-
-###############################################################################
-#
-###############################################################################
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 device ="cuda" if torch.cuda.is_available() else "cpu"
@@ -112,18 +107,18 @@ class RAGApplication:
 
     def __init__(
         self,
-        data_path="test/",
         template=prompt_template,
-        collection_name="collection",
+        collection_name="collections",
         persist_path=None, # None for non-persistent database, otherwise peristent
         embedding_model="models/multilingual-e5-large",
         llm_model="models/Llama-3.2-3B-Instruct",
         remove_empty_lines=True,
         remove_extra_whitespaces=True,
         remove_repeated_substrings=True,
-        split_by="word",
+        split_by="sentence",  # options are "word", "sentence", "passage", "page", "line" or "function"
         split_length=150,
         split_overlap=50,
+        split_threshold=10, # integer number of words, sentences, etc. document fragments should contain
         policy=DuplicatePolicy.SKIP,
         task="text-generation",
         max_new_tokens=500,
@@ -133,7 +128,6 @@ class RAGApplication:
         repetition_penalty=1.15,
         return_full_text=False,
     ):
-        self.data_path=data_path
         self.template = template
         self.collection_name=collection_name
         self.persist_path=persist_path
@@ -145,6 +139,7 @@ class RAGApplication:
         self.split_by=split_by
         self.split_length=split_length
         self.split_overlap=split_overlap
+        self.split_threshold=split_threshold  # unused for now
         self.policy=policy
         self.task=task
         self.max_new_tokens=max_new_tokens
@@ -167,9 +162,6 @@ class RAGApplication:
         if not check_directory(self.embedding_model):
             raise FileNotFoundError(f"Embedding model path not found: {self.embedding_model}")
 
-        if not check_directory(self.data_path):
-            raise FileNotFoundError(f"Data path not found: {self.data_path}")
-        
         if self.persist_path is not None:
             if not check_directory(self.persist_path):
                 os.makedirs(self.persist_path, exist_ok=True)
@@ -183,15 +175,22 @@ class RAGApplication:
             persist_path=self.persist_path
         )
 
-    def run_embedder(self):
+    def run_embedder(self, filenames: List[Path]=None):
         """
         Document processing.
         """
+        print(f"=====> {filenames}")
+
         try:
             # initialize converters
             pdf_converter = PyPDFToDocument()
             csv_converter = CSVToDocument()
             txt_converter = TextFileToDocument()
+            # html_converter = HTMLToDocument()
+            # json_converter = JSONConverter()
+            # md_converter = MarkdownToDocument()
+            # docx_converter = DOCXToDocument()
+            # pptx_converter = PPTXToDocument()
 
             # combine into a list of documents
             document_joiner = DocumentJoiner()
@@ -255,11 +254,11 @@ class RAGApplication:
                 {
                     "file_type_router":
                     {
-                        "sources": list(Path(self.data_path).glob("**/*"))
+                        "sources": filenames
                     }
                 }
             )
-            
+
             print("indexiong complete")
 
         except Exception as e:
@@ -385,17 +384,45 @@ class RAGApplication:
         except Exception as e:
             print(f"Error in RAG pipeline: {e}")
 
-def run_pipeline(question: str):
+def run_pipeline(question: str, filenames: List[Path]=None):
     """
     Run RAG pipeline
     """
+    print(f"===> {filenames}")
     rag = RAGApplication()
     rag.create_document_store()
-    rag.run_embedder()
+    rag.run_embedder(filenames)
     results = rag.run_rag(question)
 
     return results
 if __name__ == "__main__":
-    results = run_pipeline("Elaborate on the Multi-Armed Bandit problem?")
+
+    # # test 1
+    # results = run_pipeline(
+    #     "What is the Steelers chance of winning the AFC North?",
+    #     ["test/steelers.txt"]
+    # )
+
+    # # test 2:
+    # results = run_pipeline(
+    #     "Elaborate on the Multi-Armed Bandit problem?",
+    #     [
+    #         "test/CAIE-ebook-1.USAII-31085555.pdf",
+    #         "test/CAIE-ebook-2.USAII-31085555.pdf",
+    #         "test/CAIE-ebook-3.USAII-31085555.pdf"
+    #     ]
+    # )
+
+    # test 3:
+    results = run_pipeline(
+        "What are the Steelers chance of winning the AFC North?",
+        [
+            "test/CAIE-ebook-1.USAII-31085555.pdf",
+            "test/CAIE-ebook-2.USAII-31085555.pdf",
+            "test/CAIE-ebook-3.USAII-31085555.pdf",
+            "test/Newsweek_International_-_December_27_2024_freemagazines_top.pdf",
+            "test/steelers.txt"
+        ]
+    )
 
     pprint(results)
