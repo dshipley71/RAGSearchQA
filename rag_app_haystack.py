@@ -27,6 +27,9 @@ from haystack.components.builders import PromptBuilder
 from haystack.components.builders import AnswerBuilder
 from haystack.components.generators import HuggingFaceLocalGenerator
 
+from haystack.components.rankers import TransformersSimilarityRanker
+from haystack.components.rankers import SentenceTransformersDiversityRanker
+
 from transformers import BitsAndBytesConfig
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -301,8 +304,14 @@ class RAGApplication:
             )
 
             retriever = ChromaEmbeddingRetriever(
-                document_store=self.document_store
+                document_store=self.document_store,
+                top_k=3
             )
+
+            ranker = TransformersSimilarityRanker(model="models/ms-marco-MiniLM-L-6-v2")
+            ranker.warm_up()
+            #ranker = SentenceTransformersDiversityRanker(model="models/all-MiniLM-L6-v2", similarity="cosine")
+            #ranker.warm_up()
 
             prompt_builder = PromptBuilder(
                 template=self.template
@@ -314,13 +323,16 @@ class RAGApplication:
             rag_pipeline = Pipeline()
             rag_pipeline.add_component(instance=embedder, name="embedder")
             rag_pipeline.add_component(instance=retriever, name="retriever")
+            rag_pipeline.add_component(instance=ranker, name="ranker")
             rag_pipeline.add_component(instance=prompt_builder, name="prompt_builder")
             rag_pipeline.add_component(instance=answer_builder, name="answer_builder")
             rag_pipeline.add_component(instance=llm, name="llm")
 
             # connect rag components
             rag_pipeline.connect("embedder.embedding", "retriever.query_embedding")
-            rag_pipeline.connect("retriever", "prompt_builder.documents")
+            #rag_pipeline.connect("retriever", "prompt_builder.documents")
+            rag_pipeline.connect("retriever.documents", "ranker.documents")
+            rag_pipeline.connect("ranker.documents", "prompt_builder.documents")
             rag_pipeline.connect("prompt_builder", "llm")
             # rag_pipeline.connect("llm.meta", "answer_builder.replies") # TODO: add metadata when preprocessing documentation
             rag_pipeline.connect("llm.replies", "answer_builder.replies")
@@ -331,6 +343,14 @@ class RAGApplication:
                 {
                     "embedder": {
                         "text": question
+                    },
+                    # "retriever": {
+                    #     "query": question,
+                    #     "top_k": 5
+                    # },
+                    "ranker": {
+                        "query": question,
+                        "top_k": 3
                     },
                     "prompt_builder": {
                         "question": question
