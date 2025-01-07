@@ -5,7 +5,7 @@ from PIL import Image
 import streamlit as st
 from datetime import datetime
 from pathlib import Path
-from rag_app_haystack import RAGApplication  # <--- Unchanged import from your RAG code
+from rag_app_haystack import RAGApplication
 from pprint import pprint
 
 # Disable telemetry
@@ -173,9 +173,9 @@ Answer:
             # st.write("If you provide a path, the database will be persistent.")
             vector_store_path = st.text_input(
                 "ChromaDB Persist Path:",
-                "data/mystore",
-                # help="Leave blank or set to None for an in-memory database. "
-                #      "If you specify a path, Chroma will persist data there."
+                "",
+                help="Leave blank or set to None for an in-memory database. "
+                     "If you specify a path, Chroma will persist data there."
             )
             # Normalize input (strip spaces); if empty => None
             persist_path = vector_store_path.strip() if vector_store_path.strip() != "" else None
@@ -272,7 +272,7 @@ Answer:
                             st.write(
                                 f"**Path:** {src.get('file_path', 'N/A')} | "
                                 f"**Page:** {src.get('page_number', 'N/A')} | "
-                                f"**Score:** {src.get('score', 'N/A')}"
+                                f"**Score:** {float(src.get('score', 'N/A')):.5f}"
                             )
                     else:
                         st.write("No source documents found.")
@@ -293,7 +293,7 @@ Answer:
                             st.write(
                                 f"**Path:** {src.get('file_path', 'N/A')} | "
                                 f"**Page:** {src.get('page_number', 'N/A')} | "
-                                f"**Score:** {src.get('score', 'N/A')}"
+                                f"**Score:** {float(src.get('score', 'N/A')):.5f}"
                             )
                         except:
                             st.write("No source documents found.")

@@ -4,6 +4,7 @@ import rich
 import warnings
 import base64
 import io
+import logging
 
 from PIL import Image
 from pathlib import Path
@@ -29,8 +30,24 @@ from haystack.components.generators import HuggingFaceLocalGenerator
 
 from haystack.components.rankers import TransformersSimilarityRanker
 from haystack.components.rankers import SentenceTransformersDiversityRanker
+from haystack.components.readers import ExtractiveReader
+
+from haystack import tracing
+from haystack.tracing.logging_tracer import LoggingTracer
+
+from haystack.document_stores.in_memory import InMemoryDocumentStore
+from haystack.components.retrievers import InMemoryEmbeddingRetriever
 
 from transformers import BitsAndBytesConfig
+
+###############################################################################
+#
+###############################################################################
+logging.basicConfig(format="%(levelname)s - %(name)s -  %(message)s", level=logging.WARNING)
+logging.getLogger("haystack").setLevel(logging.INFO)
+
+tracing.tracer.is_content_tracing_enabled = True # to enable tracing/logging content (inputs/outputs)
+tracing.enable_tracing(LoggingTracer(tags_color_strings={"haystack.component.input": "\x1b[1;31m", "haystack.component.name": "\x1b[1;34m"}))
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 device ="cuda" if torch.cuda.is_available() else "cpu"
@@ -100,12 +117,10 @@ Answer:
 class RAGApplication:
 
     # TODO: Use configparser to load configuration parameters
-    # TODO: Replace converters with Unstructured IO
+    # TODO: Replace converters with Unstructured IO (maybe)
     # TODO: Input can be file or directory
-    # TODO: Create prompt.config file for custom prompts or use DSPy
-    # TODO: Utility functions into utils.py
-    # TODO: Add error checking
-    # TODO: Add logging
+    # TODO: Create prompt.config file for custom prompts or use DSPy (maybe)
+    # TODO: Utility functions into utils.py (maybe)
     # TODO: cache models to prevent reload
 
     def __init__(
@@ -173,10 +188,15 @@ class RAGApplication:
         """
         Create document store.
         """
-        self.document_store = ChromaDocumentStore(
-            collection_name=self.collection_name,
-            persist_path=self.persist_path
-        )
+        if self.persist_path is not None:
+            self.document_store = ChromaDocumentStore(
+                collection_name=self.collection_name,
+                persist_path=self.persist_path
+            )
+        else:
+            self.document_store = InMemoryDocumentStore(
+                embedding_similarity_function="cosine"
+            )
 
     def run_embedder(self, filenames: List[Path]=None):
         """
@@ -303,15 +323,23 @@ class RAGApplication:
                 device=ComponentDevice.from_str(device)
             )
 
-            retriever = ChromaEmbeddingRetriever(
-                document_store=self.document_store,
-                top_k=3
-            )
+            if self.persist_path is not None:
+                retriever = ChromaEmbeddingRetriever(
+                    document_store=self.document_store,
+                    top_k=10
+                )
+            else:
+                retriever = InMemoryEmbeddingRetriever(
+                    document_store=self.document_store,
+                    top_k=10
+                )
 
             ranker = TransformersSimilarityRanker(model="models/ms-marco-MiniLM-L-6-v2")
             ranker.warm_up()
             #ranker = SentenceTransformersDiversityRanker(model="models/all-MiniLM-L6-v2", similarity="cosine")
             #ranker.warm_up()
+            # reader = ExtractiveReader()
+            # reader.warm_up()
 
             prompt_builder = PromptBuilder(
                 template=self.template
@@ -324,15 +352,25 @@ class RAGApplication:
             rag_pipeline.add_component(instance=embedder, name="embedder")
             rag_pipeline.add_component(instance=retriever, name="retriever")
             rag_pipeline.add_component(instance=ranker, name="ranker")
+            # rag_pipeline.add_component(instance=reader, name="reader")
             rag_pipeline.add_component(instance=prompt_builder, name="prompt_builder")
             rag_pipeline.add_component(instance=answer_builder, name="answer_builder")
             rag_pipeline.add_component(instance=llm, name="llm")
 
             # connect rag components
             rag_pipeline.connect("embedder.embedding", "retriever.query_embedding")
-            #rag_pipeline.connect("retriever", "prompt_builder.documents")
+            
+            # # without ranker and extractive reader
+            # rag_pipeline.connect("retriever", "prompt_builder.documents")
+            
+            # with ranker
             rag_pipeline.connect("retriever.documents", "ranker.documents")
             rag_pipeline.connect("ranker.documents", "prompt_builder.documents")
+            
+            # # with extractive reader
+            # rag_pipeline.connect("retriever.documents", "reader.documents")
+            # rag_pipeline.connect("reader.answers", "prompt_builder.documents")
+            
             rag_pipeline.connect("prompt_builder", "llm")
             # rag_pipeline.connect("llm.meta", "answer_builder.replies") # TODO: add metadata when preprocessing documentation
             rag_pipeline.connect("llm.replies", "answer_builder.replies")
@@ -344,13 +382,13 @@ class RAGApplication:
                     "embedder": {
                         "text": question
                     },
-                    # "retriever": {
+                    # "reader": {
                     #     "query": question,
-                    #     "top_k": 5
+                    #     "top_k": 3
                     # },
                     "ranker": {
                         "query": question,
-                        "top_k": 3
+                        "top_k": 5
                     },
                     "prompt_builder": {
                         "question": question
@@ -390,6 +428,10 @@ class RAGApplication:
                             "content": doc.content.strip()
                         }
                         result["Source"].append(source_info)
+
+                    retrieved_sources = result.get("Source", [])
+                    result["Source"] = sorted(retrieved_sources, key=lambda x: x['score'], reverse=True)
+
                 else:
                     result["Source"] = "No documents available"
                 
@@ -403,6 +445,15 @@ class RAGApplication:
 
         except Exception as e:
             print(f"Error in RAG pipeline: {e}")
+
+    def rag_using_extractive_reader(self):
+        pass
+
+    def rag_using_similarity_ranker(self):
+        pass
+
+    def rag_using_diversity_ranker(self):
+        pass
 
 def run_pipeline(question: str, filenames: List[Path]=None):
     """
