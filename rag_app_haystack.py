@@ -351,10 +351,17 @@ class RAGApplication:
                     top_k=10
                 )
 
-            ranker = TransformersSimilarityRanker(model="models/ms-marco-MiniLM-L-6-v2")
+            # ranker = TransformersSimilarityRanker(
+            #     model="models/ms-marco-MiniLM-L-6-v2",
+            #     device=ComponentDevice.from_str(device)
+            # )
+            ranker = SentenceTransformersDiversityRanker(
+                model="models/all-MiniLM-L6-v2",
+                device=ComponentDevice.from_str(device),
+                similarity="cosine"
+            )
             ranker.warm_up()
-            #ranker = SentenceTransformersDiversityRanker(model="models/all-MiniLM-L6-v2", similarity="cosine")
-            #ranker.warm_up()
+
             # reader = ExtractiveReader()
             # reader.warm_up()
 
