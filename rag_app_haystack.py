@@ -88,6 +88,21 @@ def encode_image_to_base64(image_path: str, format: str="PNG") -> str:
         img.save(buffered, format=format)
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
+def remove_duplicates_ignore_keys(list_of_dicts, ignore_keys):
+    """Removes duplicate dictionaries from a list, ignoring specified keys."""
+
+    seen = set()
+    result = []
+
+    for d in list_of_dicts:
+        # Create a hashable representation of the dictionary, excluding ignored keys
+        key = tuple((k, v) for k, v in d.items() if k not in ignore_keys)
+
+        if key not in seen:
+            seen.add(key)
+            result.append(d)
+
+    return result
 ###############################################################################
 # prompt template
 ###############################################################################
@@ -435,8 +450,9 @@ class RAGApplication:
                     retrieved_sources = result.get("Source", [])
 
                     # remove duplicate dictionary sources
-                    retrieved_sources = list(map(dict, set(tuple(d.items()) for d in retrieved_sources)))
-                    # rich.print(retrieved_sources)
+                    retrieved_sources = remove_duplicates_ignore_keys(retrieved_sources, ["content", "score"])
+                    #retrieved_sources = list(map(dict, set(tuple(d.items()) for d in retrieved_sources)))
+                    #rich.print(retrieved_sources)
 
                     # sort scores in descending order
                     result["Source"] = sorted(retrieved_sources, key=lambda x: x['score'], reverse=True)
