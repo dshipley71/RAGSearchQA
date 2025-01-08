@@ -40,6 +40,8 @@ from haystack.components.retrievers import InMemoryEmbeddingRetriever
 
 from transformers import BitsAndBytesConfig
 
+from functools import lru_cache
+
 ###############################################################################
 #
 ###############################################################################
@@ -409,7 +411,7 @@ class RAGApplication:
                 }
             )
 
-            # Extracting the requested information
+            # extracting the requested information into result data structure
             def extract_information(data):
                 result = {
                     "Answer": data['answer_builder']['answers'][0].data.strip(),
@@ -429,7 +431,14 @@ class RAGApplication:
                         }
                         result["Source"].append(source_info)
 
+                    # get source list
                     retrieved_sources = result.get("Source", [])
+
+                    # remove duplicate dictionary sources
+                    retrieved_sources = list(map(dict, set(tuple(d.items()) for d in retrieved_sources)))
+                    # rich.print(retrieved_sources)
+
+                    # sort scores in descending order
                     result["Source"] = sorted(retrieved_sources, key=lambda x: x['score'], reverse=True)
 
                 else:
