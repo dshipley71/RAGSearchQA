@@ -451,8 +451,6 @@ class RAGApplication:
 
                     # remove duplicate dictionary sources
                     retrieved_sources = remove_duplicates_ignore_keys(retrieved_sources, ["content", "score"])
-                    #retrieved_sources = list(map(dict, set(tuple(d.items()) for d in retrieved_sources)))
-                    #rich.print(retrieved_sources)
 
                     # sort scores in descending order
                     result["Source"] = sorted(retrieved_sources, key=lambda x: x['score'], reverse=True)
