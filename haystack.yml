@@ -13,12 +13,19 @@ dependencies:
       - chromadb
       - chroma-haystack
       - haystack-ai
+#      - jq                          # json converter
       - libmagic
+#      - markdown-it-py              # markdown converter
+#      - mdit_plain                  # markdown converter
       - pillow
+      - pymupdf4llm
       - pypdf2
-      - python-magic
+#      - python-docx                 # docx converter
+      - python-magic 
+#      - python-pptx                 # pptx converter
       - sentence-transformers
       - streamlit
+#     - tika                         # tika converter; also requires tika docker container
       - torch
       - torchvision
       - torchaudio

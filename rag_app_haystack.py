@@ -17,7 +17,8 @@ from haystack.utils import ComponentDevice
 from haystack.document_stores.types import DuplicatePolicy
 from haystack_integrations.document_stores.chroma import ChromaDocumentStore
 from haystack_integrations.components.retrievers.chroma import ChromaEmbeddingRetriever
-from haystack.components.converters import PyPDFToDocument, TextFileToDocument, CSVToDocument
+from haystack.components.converters import PyPDFToDocument, TextFileToDocument, CSVToDocument, PDFMinerToDocument
+# from haystack.components.converters import MarkdownToDocument, HTMLToDocument, JSONConverter, PPTXToDocument, DOCXToDocument
 from haystack.components.routers import FileTypeRouter
 from haystack.components.joiners import DocumentJoiner
 from haystack.components.preprocessors import DocumentCleaner, DocumentSplitter
@@ -40,7 +41,7 @@ from haystack.components.retrievers import InMemoryEmbeddingRetriever
 
 from transformers import BitsAndBytesConfig
 
-from functools import lru_cache
+from haystack_integrations.components.converters.unstructured import UnstructuredFileConverter
 
 ###############################################################################
 #
@@ -174,7 +175,7 @@ class RAGApplication:
         self.split_by=split_by
         self.split_length=split_length
         self.split_overlap=split_overlap
-        self.split_threshold=split_threshold  # unused for now
+        self.split_threshold=split_threshold
         self.policy=policy
         self.task=task
         self.max_new_tokens=max_new_tokens
@@ -223,12 +224,13 @@ class RAGApplication:
 
         try:
             # initialize converters
-            pdf_converter = PyPDFToDocument()
+            # pdf_converter = PyPDFToDocument()
+            pdf_converter = PDFMinerToDocument()
             csv_converter = CSVToDocument()
             txt_converter = TextFileToDocument()
+            # md_converter = MarkdownToDocument()
             # html_converter = HTMLToDocument()
             # json_converter = JSONConverter()
-            # md_converter = MarkdownToDocument()
             # docx_converter = DOCXToDocument()
             # pptx_converter = PPTXToDocument()
 
@@ -271,6 +273,11 @@ class RAGApplication:
             indexing_pipeline.add_component(instance=txt_converter, name="txt_converter")
             indexing_pipeline.add_component(instance=pdf_converter, name="pdf_converter")
             indexing_pipeline.add_component(instance=csv_converter, name="csv_converter")
+            # indexing_pipeline.add_component(instance=md_converter, name="md_converter")
+            # indexing_pipeline.add_component(instance=html_converter, name="html_converter")
+            # indexing_pipeline.add_component(instance=json_converter, name="json_converter")
+            # indexing_pipeline.add_component(instance=docx_converter, name="docx_converter")
+            # indexing_pipeline.add_component(instance=pptx_converter, name="pptx_converter")
             indexing_pipeline.add_component(instance=document_joiner, name="document_joiner")
             indexing_pipeline.add_component(instance=document_cleaner, name="document_cleaner")
             indexing_pipeline.add_component(instance=document_splitter, name="document_splitter")
@@ -281,6 +288,11 @@ class RAGApplication:
             indexing_pipeline.connect("file_type_router.text/plain", "txt_converter.sources")
             indexing_pipeline.connect("file_type_router.text/csv", "csv_converter.sources")
             indexing_pipeline.connect("file_type_router.application/pdf", "pdf_converter.sources")
+            # indexing_pipeline.connect("file_type_router.text/markdown", "md_converter.sources")
+            # indexing_pipeline.connect("file_type_router.text/html", "html_converter.sources")
+            # indexing_pipeline.connect("file_type_router.application/json", "json_converter.sources")
+            # indexing_pipeline.connect("file_type_router.application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx_converter.sources")
+            # indexing_pipeline.connect("file_type_router.application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx_converter.sources")
             indexing_pipeline.connect("txt_converter", "document_joiner")
             indexing_pipeline.connect("csv_converter", "document_joiner")
             indexing_pipeline.connect("pdf_converter", "document_joiner")
@@ -299,10 +311,81 @@ class RAGApplication:
                 }
             )
 
-            print("indexiong complete")
+            print("indexing complete")
 
         except Exception as e:
             print(f"Error during embedding: {e}")
+
+    # def run_embedder(self, filenames: List[Path]=None):
+    #     """
+    #     Document processing.
+    #
+    #     This function requires the use of the unstructured io docker container.
+    #     Run container as follows:
+    #
+    #     docker run -p 8000:8000 -d --rm --name unstructured-api quay.io/unstructured-io/unstructured-api:latest --port 8000 --host 0.0.0.0
+    #
+    #     """
+    #     print(f"=====> {filenames}")
+
+    #     try:
+    #         document_converter = UnstructuredFileConverter(
+    #             api_url="http://localhost:8000/general/v0/general",
+    #             document_creation_mode="one-doc-per-element"
+    #         )
+
+    #         # create components
+    #         document_cleaner = DocumentCleaner(
+    #             remove_empty_lines=self.remove_empty_lines,
+    #             remove_extra_whitespaces=self.remove_extra_whitespaces,
+    #             remove_repeated_substrings=self.remove_repeated_substrings
+    #         )
+
+    #         document_splitter = DocumentSplitter(
+    #             split_by=self.split_by,
+    #             split_length=self.split_length,
+    #             split_overlap=self.split_overlap
+    #         )
+
+    #         document_embedder = SentenceTransformersDocumentEmbedder(
+    #             model=self.embedding_model,
+    #             device=ComponentDevice.from_str(device)
+    #         )
+
+    #         document_writer = DocumentWriter(
+    #             self.document_store,
+    #             policy=self.policy
+    #         )
+
+    #         document_embedder.warm_up()
+
+    #         # add components to pipeline
+    #         indexing_pipeline = Pipeline()
+    #         indexing_pipeline.add_component(instance=document_converter, name="document_converter")
+    #         indexing_pipeline.add_component(instance=document_cleaner, name="document_cleaner")
+    #         indexing_pipeline.add_component(instance=document_splitter, name="document_splitter")
+    #         indexing_pipeline.add_component(instance=document_embedder, name="document_embedder")
+    #         indexing_pipeline.add_component(instance=document_writer, name="document_writer")
+            
+    #         # connect components
+    #         indexing_pipeline.connect("document_converter", "document_cleaner")
+    #         indexing_pipeline.connect("document_cleaner", "document_splitter")
+    #         indexing_pipeline.connect("document_splitter", "document_embedder")
+    #         indexing_pipeline.connect("document_embedder", "document_writer")
+
+    #         indexing_pipeline.run(
+    #             {
+    #                 "document_converter":
+    #                 {
+    #                     "paths": filenames
+    #                 }
+    #             }
+    #         )
+
+    #         print("indexing complete")
+
+    #     except Exception as e:
+    #         print(f"Error during embedding: {e}")
 
     def run_rag(self, question: str):
         """
