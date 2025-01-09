@@ -30,9 +30,10 @@ def initialize_rag_application(
     max_new_tokens,
     temperature,
     top_p,
+    chunk_type,
     chunk_size,
     chunk_overlap,
-    use_chunking
+    chunk_threshold,
 ):
     """
     Initializes and caches the RAGApplication object from rag_app_haystack.
@@ -49,10 +50,10 @@ def initialize_rag_application(
         remove_empty_lines=True,
         remove_extra_whitespaces=True,
         remove_repeated_substrings=True,
-        split_by="sentence",                   # This can be "sentence", "word", etc.
-        split_length=chunk_size if use_chunking else 150,
-        split_overlap=chunk_overlap if use_chunking else 50,
-        split_threshold=10,
+        split_by=chunk_type,
+        split_length=chunk_size,
+        split_overlap=chunk_overlap,
+        split_threshold=chunk_threshold,
         max_new_tokens=max_new_tokens,
         temperature=temperature,
         top_p=top_p,
@@ -199,19 +200,30 @@ Answer:
 
         # Document Settings
         with st.expander(label="Document Settings:", expanded=False):
-            chunk_text = st.checkbox("Chunk Text", value=True)
-            chunk_size = st.number_input("Chunk Size", min_value=50, max_value=2000, value=150, step=50)
-            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, max_value=500, value=50, step=10)
+            chunk_type = st.selectbox("Split By:", ["word", "sentence", "passage"], help="Split document by selected type")
+            chunk_size = st.number_input("Split Length:", min_value=5, max_value=2000, value=75, step=5)
+            chunk_overlap = st.number_input("Split Overlap", min_value=0, max_value=500, value=25, step=5)
+            chunk_threshold = st.number_input("Split Threshold", min_value=0, max_value=500, value=5, step=5)
 
         # LLM Settings
         with st.expander(label="LLM Settings:", expanded=False):
-            max_new_tokens = st.number_input("Max New Tokens", min_value=50, max_value=65536, value=500, step=50)
+            max_new_tokens = st.number_input("Max New Tokens", min_value=50, max_value=8192, value=500, step=50)
             temperature = st.number_input("Temperature", min_value=0.0, max_value=2.0, value=0.1, step=0.01)
             top_p = st.number_input("Top P", min_value=0.0, max_value=1.0, value=0.95, step=0.01)
 
     # Main content in col2
     with col2:
-        st.image("assets/ai_banner.jpg", use_container_width=True)
+        image = Image.open("assets/ai_banner.jpg")
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        html_temp = f"""
+        <div style="text-align: center;">
+        <img src="data:image/jpeg;base64,{img_str}"/>
+        </div>
+        """
+        st.markdown(html_temp, unsafe_allow_html=True)
+        # st.image("assets/ai_banner.jpg", use_container_width=True)
         st.header("AI Document Q&A")
 
         # Initialize session state for conversation history
@@ -228,9 +240,10 @@ Answer:
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_p=top_p,
+            chunk_type=chunk_type,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            use_chunking=chunk_text,
+            chunk_threshold=chunk_threshold,
         )
 
         # Process new uploads on user’s request
@@ -270,8 +283,9 @@ Answer:
                     if isinstance(retrieved_sources, list):
                         for src in retrieved_sources:
                             st.write(
-                                f"**Path:** {src.get('file_path', 'N/A')} | "
+                                f"**Path:** {os.path.basename(src.get('file_path', 'N/A'))} | "
                                 f"**Page:** {src.get('page_number', 'N/A')} | "
+                                f"**Content:** {src.get('content', 'N/A')} | "
                                 f"**Score:** {float(src.get('score', 'N/A')):.5f}"
                             )
                     else:
@@ -291,8 +305,9 @@ Answer:
                     for src in entry["source_documents"]:
                         try:
                             st.write(
-                                f"**Path:** {src.get('file_path', 'N/A')} | "
+                                f"**Path:** {os.path.basename(src.get('file_path', 'N/A'))} | "
                                 f"**Page:** {src.get('page_number', 'N/A')} | "
+                                f"**Content:** {src.get('content', 'N/A')} | "
                                 f"**Score:** {float(src.get('score', 'N/A')):.5f}"
                             )
                         except:
