@@ -18,6 +18,7 @@ from haystack.document_stores.types import DuplicatePolicy
 from haystack_integrations.document_stores.chroma import ChromaDocumentStore
 from haystack_integrations.components.retrievers.chroma import ChromaEmbeddingRetriever
 from haystack.components.converters import PyPDFToDocument, TextFileToDocument, CSVToDocument, PDFMinerToDocument
+from haystack.components.converters import TikaDocumentConverter
 # from haystack.components.converters import MarkdownToDocument, HTMLToDocument, JSONConverter, PPTXToDocument, DOCXToDocument
 from haystack.components.routers import FileTypeRouter
 from haystack.components.joiners import DocumentJoiner
@@ -216,7 +217,7 @@ class RAGApplication:
                 embedding_similarity_function="cosine"
             )
 
-    def run_embedder(self, filenames: List[Path]=None):
+    def haystack_extractor(self, filenames: List[Path]=None):
         """
         Document processing.
         """
@@ -316,76 +317,149 @@ class RAGApplication:
         except Exception as e:
             print(f"Error during embedding: {e}")
 
-    # def run_embedder(self, filenames: List[Path]=None):
-    #     """
-    #     Document processing.
-    #
-    #     This function requires the use of the unstructured io docker container.
-    #     Run container as follows:
-    #
-    #     docker run -p 8000:8000 -d --rm --name unstructured-api quay.io/unstructured-io/unstructured-api:latest --port 8000 --host 0.0.0.0
-    #
-    #     """
-    #     print(f"=====> {filenames}")
+    def tika_extractor(self, filenames: List[Path]=None):
+        """
+        Get latest docker container and launch it as follows:
+        docker pull apache/tika
 
-    #     try:
-    #         document_converter = UnstructuredFileConverter(
-    #             api_url="http://localhost:8000/general/v0/general",
-    #             document_creation_mode="one-doc-per-element"
-    #         )
+        Perform Tika document processing.
+    
+        This function requires the use of the Tika docker container.
+        Run container as follows:
+    
+        docker run -d --name tika -p 127.0.0.1:9998:9998 apache/tika:<version>
+    
+        """
+        print(f"=====> {filenames}")
 
-    #         # create components
-    #         document_cleaner = DocumentCleaner(
-    #             remove_empty_lines=self.remove_empty_lines,
-    #             remove_extra_whitespaces=self.remove_extra_whitespaces,
-    #             remove_repeated_substrings=self.remove_repeated_substrings
-    #         )
+        try:
+            document_converter = TikaDocumentConverter(
+                tika_url="http://localhost:9998/tika",
+            )
 
-    #         document_splitter = DocumentSplitter(
-    #             split_by=self.split_by,
-    #             split_length=self.split_length,
-    #             split_overlap=self.split_overlap
-    #         )
+            # create components
+            document_cleaner = DocumentCleaner(
+                remove_empty_lines=self.remove_empty_lines,
+                remove_extra_whitespaces=self.remove_extra_whitespaces,
+                remove_repeated_substrings=self.remove_repeated_substrings
+            )
 
-    #         document_embedder = SentenceTransformersDocumentEmbedder(
-    #             model=self.embedding_model,
-    #             device=ComponentDevice.from_str(device)
-    #         )
+            document_splitter = DocumentSplitter(
+                split_by=self.split_by,
+                split_length=self.split_length,
+                split_overlap=self.split_overlap
+            )
 
-    #         document_writer = DocumentWriter(
-    #             self.document_store,
-    #             policy=self.policy
-    #         )
+            document_embedder = SentenceTransformersDocumentEmbedder(
+                model=self.embedding_model,
+                device=ComponentDevice.from_str(device)
+            )
 
-    #         document_embedder.warm_up()
+            document_writer = DocumentWriter(
+                self.document_store,
+                policy=self.policy
+            )
 
-    #         # add components to pipeline
-    #         indexing_pipeline = Pipeline()
-    #         indexing_pipeline.add_component(instance=document_converter, name="document_converter")
-    #         indexing_pipeline.add_component(instance=document_cleaner, name="document_cleaner")
-    #         indexing_pipeline.add_component(instance=document_splitter, name="document_splitter")
-    #         indexing_pipeline.add_component(instance=document_embedder, name="document_embedder")
-    #         indexing_pipeline.add_component(instance=document_writer, name="document_writer")
+            document_embedder.warm_up()
+
+            # add components to pipeline
+            indexing_pipeline = Pipeline()
+            indexing_pipeline.add_component(instance=document_converter, name="document_converter")
+            indexing_pipeline.add_component(instance=document_cleaner, name="document_cleaner")
+            indexing_pipeline.add_component(instance=document_splitter, name="document_splitter")
+            indexing_pipeline.add_component(instance=document_embedder, name="document_embedder")
+            indexing_pipeline.add_component(instance=document_writer, name="document_writer")
             
-    #         # connect components
-    #         indexing_pipeline.connect("document_converter", "document_cleaner")
-    #         indexing_pipeline.connect("document_cleaner", "document_splitter")
-    #         indexing_pipeline.connect("document_splitter", "document_embedder")
-    #         indexing_pipeline.connect("document_embedder", "document_writer")
+            # connect components
+            indexing_pipeline.connect("document_converter", "document_cleaner")
+            indexing_pipeline.connect("document_cleaner", "document_splitter")
+            indexing_pipeline.connect("document_splitter", "document_embedder")
+            indexing_pipeline.connect("document_embedder", "document_writer")
 
-    #         indexing_pipeline.run(
-    #             {
-    #                 "document_converter":
-    #                 {
-    #                     "paths": filenames
-    #                 }
-    #             }
-    #         )
+            indexing_pipeline.run(
+                {
+                    "document_converter":
+                    {
+                        "sources": filenames
+                    }
+                }
+            )
 
-    #         print("indexing complete")
+            print("indexing complete")
 
-    #     except Exception as e:
-    #         print(f"Error during embedding: {e}")
+        except Exception as e:
+            print(f"Error during embedding: {e}")
+
+    def unstructured_extractor(self, filenames: List[Path]=None):
+        """
+        Document processing.
+    
+        This function requires the use of the unstructured io docker container.
+        Run container as follows:
+    
+        docker run -p 8000:8000 -d --rm --name unstructured-api quay.io/unstructured-io/unstructured-api:latest --port 8000 --host 0.0.0.0
+    
+        """
+        print(f"=====> {filenames}")
+
+        try:
+            document_converter = UnstructuredFileConverter(
+                api_url="http://localhost:8000/general/v0/general",
+                document_creation_mode="one-doc-per-element"
+            )
+
+            # create components
+            document_cleaner = DocumentCleaner(
+                remove_empty_lines=self.remove_empty_lines,
+                remove_extra_whitespaces=self.remove_extra_whitespaces,
+                remove_repeated_substrings=self.remove_repeated_substrings
+            )
+
+            document_splitter = DocumentSplitter(
+                split_by=self.split_by,
+                split_length=self.split_length,
+                split_overlap=self.split_overlap
+            )
+
+            document_embedder = SentenceTransformersDocumentEmbedder(
+                model=self.embedding_model,
+                device=ComponentDevice.from_str(device)
+            )
+
+            document_writer = DocumentWriter(
+                self.document_store,
+                policy=self.policy
+            )
+
+            document_embedder.warm_up()
+
+            # add components to pipeline
+            indexing_pipeline = Pipeline()
+            indexing_pipeline.add_component(instance=document_converter, name="document_converter")
+            indexing_pipeline.add_component(instance=document_cleaner, name="document_cleaner")
+            indexing_pipeline.add_component(instance=document_splitter, name="document_splitter")
+            indexing_pipeline.add_component(instance=document_embedder, name="document_embedder")
+            indexing_pipeline.add_component(instance=document_writer, name="document_writer")
+            
+            # connect components
+            indexing_pipeline.connect("document_converter", "document_cleaner")
+            indexing_pipeline.connect("document_cleaner", "document_splitter")
+            indexing_pipeline.connect("document_splitter", "document_embedder")
+            indexing_pipeline.connect("document_embedder", "document_writer")
+
+            indexing_pipeline.run(
+                {
+                    "document_converter":
+                    {
+                        "paths": filenames
+                    }
+                }
+            )
+
+            print("indexing complete")
+
+        except Exception as e:
+            print(f"Error during embedding: {e}")
 
     def run_rag(self, question: str):
         """
@@ -574,8 +648,10 @@ def run_pipeline(question: str, filenames: List[Path]=None):
     """
     print(f"===> {filenames}")
     rag = RAGApplication()
-    rag.create_document_store()
-    rag.run_embedder(filenames)
+    # rag.create_document_store()
+    rag.haystack_extractor(filenames)
+    rag.tika_extractor(filenames)
+    # rag.unstructured_extractor(filenames)
     results = rag.run_rag(question)
 
     return results

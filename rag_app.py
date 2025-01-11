@@ -253,7 +253,9 @@ Answer:
             else:
                 with st.spinner("Indexing documents..."):
                     file_paths = save_uploaded_files(data_files)
-                    rag.run_embedder(file_paths)
+                    # rag.haystack_extractor(file_paths)
+                    rag.tika_extractor(file_paths)
+                    # rag.unstructured_extractor(file_paths)
                 st.sidebar.success("Documents indexed successfully!")
 
         # Q&A section
