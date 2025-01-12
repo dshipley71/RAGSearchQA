@@ -2,6 +2,8 @@ import os
 import io
 import base64
 import configparser
+import shutil
+
 from PIL import Image
 import streamlit as st
 from datetime import datetime
@@ -33,6 +35,9 @@ def load_settings():
         "split_length": config.getint("Documents", "split_length", fallback=150),
         "split_overlap": config.getint("Documents", "split_overlap", fallback=50),
         "split_threshold": config.getint("Documents", "split_threshold", fallback=10),
+        "policy": config.get("Documents", "policy", fallback="overwrite"),
+        "tika_url": config.get("Dcouments", "tika_url", fallback="http://localhost:9998/tika"),
+        "unstructured_url": config.get("Dcouments", "unstructured_url", fallback="http://localhost:8000/general/v0/general"),
         "remove_empty_lines": config.getboolean("Documents", "remove_empty_lines", fallback=True),
         "remove_extra_whitespaces": config.getboolean("Documents", "remove_extra_whitespaces", fallback=True),
         "remove_repeated_substrings": config.getboolean("Documents", "remove_repeated_substrings", fallback=True),
@@ -43,9 +48,10 @@ def load_settings():
         "repetition_penalty": config.getfloat("LLM", "repetition_penalty", fallback=1.15),
         "return_full_text": config.getboolean("LLM", "return_full_text", fallback=False),
         "template": config.get("Prompts", "template", fallback=""),
-        "pipeline": config.get("Extraction", "pipeline", fallback="tika"),
+        "pipeline": config.get("Indexing Pipeline", "pipeline", fallback="tika"),
     }
     settings["persist_path"] = settings["persist_path"].strip() or None
+    settings["policy"] = settings["policy"] if settings["policy"] in {"overwrite", "skip", "fail"} else None
     return settings
 
 settings = load_settings()
@@ -72,12 +78,15 @@ def initialize_rag_application(system_prompt):
         split_length=settings["split_length"],
         split_overlap=settings["split_overlap"],
         split_threshold=settings["split_threshold"],
+        policy=settings["policy"],
         max_new_tokens=settings["max_new_tokens"],
         temperature=settings["temperature"],
         top_p=settings["top_p"],
         top_k=settings["top_k"],
         repetition_penalty=settings["repetition_penalty"],
         return_full_text=settings["return_full_text"],
+        tika_url=settings["tika_url"],
+        unstructured_url=settings["unstructured_url"],
     )
     rag.create_document_store()
     return rag
@@ -142,9 +151,17 @@ def main():
                 file_paths = save_uploaded_files(data_files)
                 if settings["pipeline"] == "tika":
                     rag.tika_extractor(file_paths)
+                elif settings["pipeline"] == "unstructured":
+                    rag.unstructured_extractor(file_paths)
+                elif settings["pipeline"] == "haystack":
+                    rag.haystack_extractor(file_paths)
                 else:
-                    st.error("Unsupported extraction pipeline.")
-            st.sidebar.success("Documents indexed successfully!")
+                    st.sidebar.error(f"Unsupported extraction pipeline: {settings['pipeline']}.")
+                st.sidebar.success("Documents indexed successfully!")
+
+                # remove temp directory
+                for file in file_paths:
+                    os.remove(file)
 
     user_question = st.text_input("Ask a Question from the Files")
     if user_question:

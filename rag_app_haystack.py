@@ -140,10 +140,6 @@ Answer:
 ###############################################################################
 class RAGApplication:
 
-    # TODO: Use configparser to load configuration parameters
-    # TODO: Replace converters with Unstructured IO (maybe)
-    # TODO: Input can be file or directory
-    # TODO: Create prompt.config file for custom prompts or use DSPy (maybe)
     # TODO: Utility functions into utils.py (maybe)
     # TODO: cache models to prevent reload
 
@@ -161,7 +157,7 @@ class RAGApplication:
         split_length=150,
         split_overlap=50,
         split_threshold=10, # integer number of words, sentences, etc. document fragments should contain
-        policy=DuplicatePolicy.SKIP,
+        policy=DuplicatePolicy.OVERWRITE,
         task="text-generation",
         max_new_tokens=500,
         temperature=0.1,
@@ -169,6 +165,8 @@ class RAGApplication:
         top_p=0.95,
         repetition_penalty=1.15,
         return_full_text=False,
+        tika_url="http://localhost:9998/tika",
+        unstructured_url="http://localhost:8000/general/v0/general",
     ):
         self.template = template
         self.collection_name=collection_name
@@ -182,7 +180,6 @@ class RAGApplication:
         self.split_length=split_length
         self.split_overlap=split_overlap
         self.split_threshold=split_threshold
-        self.policy=policy
         self.task=task
         self.max_new_tokens=max_new_tokens
         self.temperature=temperature
@@ -190,6 +187,18 @@ class RAGApplication:
         self.top_p=top_p
         self.repetition_penalty=repetition_penalty
         self.return_full_text=return_full_text
+        self.tika_url=tika_url
+        self.unstructured_url=unstructured_url
+
+        print(f"=====> Policy: {policy}")
+        if policy == "skip":
+            self.policy=DuplicatePolicy.SKIP
+        elif policy == "overwrite":
+            self.policy=DuplicatePolicy.OVERWRITE
+        elif policy == "fail":
+            self.policy=DuplicatePolicy.FAIL
+        else:
+            self.policy=None
 
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -198,7 +207,6 @@ class RAGApplication:
             bnb_4bit_compute_dtype= torch.bfloat16
         )
 
-        print(f"===> {self.llm_model}")
         if not check_directory(self.llm_model):
             raise FileNotFoundError(f"LLM model path not found: {self.llm_model}")
 
@@ -213,15 +221,14 @@ class RAGApplication:
         """
         Create document store.
         """
-        print(f"=====> persist path: {self.persist_path}")
         if self.persist_path is not None:
-            print("=====> Chroma")
+            print("=====> Persistence Storage Using Chroma Database")
             self.document_store = ChromaDocumentStore(
                 collection_name=self.collection_name,
                 persist_path=self.persist_path
             )
         else:
-            print("=====> In-Memory")
+            print("=====> Non-Persistent Storage Using Haystack In-Memory Database")
             self.document_store = InMemoryDocumentStore(
                 embedding_similarity_function="cosine"
             )
@@ -230,6 +237,7 @@ class RAGApplication:
         """
         Document processing.
         """
+        print(f"=====> Indexing files using Haystack-AI")
         print(f"=====> {filenames}")
 
         try:
@@ -339,11 +347,12 @@ class RAGApplication:
         docker run -d --name tika -p 127.0.0.1:9998:9998 apache/tika:<version>
     
         """
+        print(f"=====> Indexing files using Apache Tika")
         print(f"=====> {filenames}")
 
         try:
             document_converter = TikaDocumentConverter(
-                tika_url="http://localhost:9998/tika",
+                tika_url=self.tika_url,
             )
 
             # create components
@@ -409,11 +418,12 @@ class RAGApplication:
         docker run -p 8000:8000 -d --rm --name unstructured-api quay.io/unstructured-io/unstructured-api:latest --port 8000 --host 0.0.0.0
     
         """
+        print(f"=====> Indexing files using Unstructured IO")
         print(f"=====> {filenames}")
 
         try:
             document_converter = UnstructuredFileConverter(
-                api_url="http://localhost:8000/general/v0/general",
+                api_url=self.unstructured_url,
                 document_creation_mode="one-doc-per-element"
             )
 
@@ -655,7 +665,7 @@ def run_pipeline(question: str, filenames: List[Path]=None):
     """
     Run RAG pipeline
     """
-    print(f"===> {filenames}")
+    print(f"=====> {filenames}")
     rag = RAGApplication()
     # rag.create_document_store()
     rag.haystack_extractor(filenames)
