@@ -44,6 +44,11 @@ from transformers import BitsAndBytesConfig
 
 from haystack_integrations.components.converters.unstructured import UnstructuredFileConverter
 
+from haystack.components.generators.chat import OpenAIChatGenerator
+from haystack.dataclasses import ChatMessage
+from haystack.utils import Secret
+
+
 ###############################################################################
 #
 ###############################################################################
@@ -152,7 +157,7 @@ class RAGApplication:
         remove_empty_lines=True,
         remove_extra_whitespaces=True,
         remove_repeated_substrings=True,
-        split_by="sentence",  # options are "word", "sentence", "passage", "page", "line" or "function"
+        split_by="word",  # options are "word", "sentence", "passage", "page", "line" or "function"
         split_length=150,
         split_overlap=50,
         split_threshold=10, # integer number of words, sentences, etc. document fragments should contain
@@ -193,6 +198,7 @@ class RAGApplication:
             bnb_4bit_compute_dtype= torch.bfloat16
         )
 
+        print(f"===> {self.llm_model}")
         if not check_directory(self.llm_model):
             raise FileNotFoundError(f"LLM model path not found: {self.llm_model}")
 
@@ -207,12 +213,15 @@ class RAGApplication:
         """
         Create document store.
         """
+        print(f"=====> persist path: {self.persist_path}")
         if self.persist_path is not None:
+            print("=====> Chroma")
             self.document_store = ChromaDocumentStore(
                 collection_name=self.collection_name,
                 persist_path=self.persist_path
             )
         else:
+            print("=====> In-Memory")
             self.document_store = InMemoryDocumentStore(
                 embedding_similarity_function="cosine"
             )
